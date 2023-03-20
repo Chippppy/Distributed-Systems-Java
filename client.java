@@ -3,37 +3,41 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.Arrays;
 
 public class client {
     
     public static void main(String[] args) {  
-        try {      
+        try {    
+			// SETUP SOCKET  
             Socket s=new Socket("127.0.0.1",50000);  
             
+			// SETUP DATASTREAMS
             DataOutputStream dout=new DataOutputStream(s.getOutputStream());
             BufferedReader dis = new BufferedReader(new InputStreamReader(s.getInputStream()));
             
+			//INITIATE HANDSHAKE BETWEEN SERVER AND CLIENT
 			String firstResponse = initHandshake(s, dout, dis);
-			// The below line runs every time... Even if firstResponse is equal to "OK" Not sure whats happening...
-			//if(firstResponse != "OK") {quitSession(s, dout, dis);};
+
+			// CHECK IF HANDSHAKE WAS SUCCESSFUL. IF NOT SUCCESSFUL - QUIT SESSION.
+			// (Always successful, same config every runtime)
+			if(firstResponse.compareTo("OK") != 0) {
+				quitSession(s, dout, dis);
+			};
 			
 			// SEND FIRST REDY
-			System.out.println("C: Send REDY\n");
-			dout.write(("REDY\n").getBytes());
-			dout.flush();
+			sendBasicCommand(s, dout, dis, "REDY");
 
-			// READ RESPONSE
-			String response=(String)dis.readLine(); 
-			System.out.println("C: Recv " + response + ", FROM SERVER\n");
+			// READ FIRST RESPONSE
+			String response = readResponse(s, dout, dis);
 
-			scheduleJob(s, dout, dis, response);
+			// GET ALL SERVER INFORMATION & SAVE LARGEST TYPE WITH #OF LARGEST SERVERS APPENDED INTO RESPONSE ARRAY
+			String[] largestServer = getLargestServer(s, dout, dis);
 
-			// READ RESPONSE
-			response=(String)dis.readLine(); 
-			System.out.println("C: Recv " + response + ", FROM SERVER\n");
+			// START LOOP BETWEEN SERVER AND CLIENT WITH RECURSION & FIRST REDY RESPONSE
+			commandHandler(s, dout, dis, response, largestServer);
 
-			quitSession(s, dout, dis);
-
+			// COMMAND HELPER WILL ALWAYS FINISH WITH THE 'quitSession' FUNCTION & THEN CLOSE RESOURCES BELOW.
             dout.close();
             s.close();
         } catch(Exception e) {
@@ -41,48 +45,51 @@ public class client {
         }
     }
 
-	public static String initHandshake(Socket s, DataOutputStream output, BufferedReader input) throws IOException {
-		// SEND HELO
-		System.out.println("C: Send HELO\n");
-		output.write(("HELO\n").getBytes());
-		output.flush();
-
+	public static String readResponse(Socket s, DataOutputStream output, BufferedReader input) throws IOException {
 		// READ RESPONSE
 		String str=(String)input.readLine();  
         System.out.println("C: Recv " + str + ", FROM SERVER\n");
+		return str;
+	}
 
-		// SEND AUTH
-		String username = System.getProperty("user.name");
-		System.out.println("C: Send AUTH with username: "+username+"\n");
-		output.write(("AUTH "+username+"\n").getBytes());
+	public static void sendBasicCommand (Socket s, DataOutputStream output, BufferedReader input, String command) throws IOException {
+		// SEND COMMAND
+		System.out.println("C: Send "+command+"\n");
+		output.write((command+"\n").getBytes());
 		output.flush();
+	}
+
+	public static String initHandshake(Socket s, DataOutputStream output, BufferedReader input) throws IOException {
+		// SEND HELO
+		sendBasicCommand(s, output, input, "HELO");
 
 		// READ RESPONSE
-		str=(String)input.readLine();   
-		System.out.println("C: Recv " + str + ", FROM SERVER\n");
+		String str = readResponse(s, output, input);
 
+		// SEND AUTH COMMAND
+		String username = System.getProperty("user.name");
+		sendBasicCommand(s, output, input, "AUTH "+username);
+
+		// READ RESPONSE
+		str = readResponse(s, output, input);
+
+		// RETURN RESPONSE TO CHECK IF CONNECTED
 		return str;
 	}
 
 	public static void quitSession(Socket s, DataOutputStream output, BufferedReader input) throws IOException {
 		// SEND QUIT 
-		System.out.println("C: Send QUIT to server\n");
-		output.write(("QUIT\n").getBytes());
-		output.flush();
-
-		// READ RESPONSE
-		String str=(String)input.readLine();   
-		System.out.println("C: Recv " + str + ", FROM SERVER\n");
+		sendBasicCommand(s, output, input, "QUIT");
+		// RECEIVE QUIT CONFIRMATION
+		readResponse(s, output, input);
 	}
 
 	public static String[] getLargestServer(Socket s, DataOutputStream output, BufferedReader input) throws IOException {
 		System.out.println("Getting largest Server");
 		// SEND GETS
-		System.out.println("C: Send GETS to server\n");
-		output.write(("GETS All\n").getBytes());
-		output.flush();
+		sendBasicCommand(s, output, input, "GETS All");
 
-		//READ DATA RESPONSE
+		//READ DATA RESPONSE CAPTURING nRecs & nRecSize
 		String str = (String)input.readLine();
 		String[] data = str.split(" ");
 		int nRecs = Integer.parseInt(data[1]);
@@ -91,17 +98,15 @@ public class client {
 		System.out.println("C: Recv " + str + ", FROM SERVER\n");
 
 		// SEND OK
-		System.out.println("C: Send OK to server\n");
-		output.write(("OK\n").getBytes());
-		output.flush();
+		sendBasicCommand(s, output, input, "OK");
 
 		int maxNumCores = 0;
 		int numServersWithMax = 0;
 		String largestServerType = "";
-		String[] largestServer = {};
+		String[] largestServer = new String[11];
 
 		for(int i=0;i<nRecs;i++) {
-			//READ RESPONSE
+			//READ ALL SERVER RESPONSE LINES
 			str = (String)input.readLine();
 			System.out.println("C: Recv " + str + ", FROM SERVER");
 			String[] serverData = str.split(" ");
@@ -116,31 +121,77 @@ public class client {
 			}
 		}
 
-		System.out.println("Max Cores = "+maxNumCores+"\n# Servers with those cores = "+numServersWithMax+"\nLargest Server Type = "+largestServerType);
+		System.out.println("Max # Cores = "+maxNumCores);
+		System.out.println("# Servers with those cores = "+numServersWithMax);
+		System.out.println("Largest Server Type = "+largestServerType);
+
+		largestServer = Arrays.copyOf(largestServer, largestServer.length+1);
+		largestServer[largestServer.length-1] = Integer.toString(numServersWithMax);
+		System.out.println(Arrays.toString(largestServer));
 
 		// SEND OK
-		System.out.println("C: Send OK to server\n");
-		output.write(("OK\n").getBytes());
-		output.flush();
+		sendBasicCommand(s, output, input, "OK");
 
 		// READ RESPONSE
-		str=(String)input.readLine();   
-		System.out.println("C: Recv " + str + ", FROM SERVER\n");
+		readResponse(s, output, input);
 
+		// RETURN LARGEST SERVER DATA WITH # OF LARGEST SERVERS APPENDED TO END OF ARRAY
 		return largestServer;
 	}
 
-	public static void scheduleJob(Socket s, DataOutputStream output, BufferedReader input, String job) throws IOException {
+	public static void commandHandler(Socket s, DataOutputStream output, BufferedReader input, String command, String[] largestServer) throws IOException {
+		String commandType = command.split(" ")[0];
+		String response = "";
+		switch(commandType) {
+			case ("JOBN"):
+				response = scheduleJob(s, output, input, command, largestServer);
+				commandHandler(s, output, input, response, largestServer);
+				break;
+
+			case ("JOBP"):
+
+			case ("JCPL"):
+				sendBasicCommand(s, output, input, "REDY");
+				response = readResponse(s, output, input);
+				commandHandler(s, output, input, response, largestServer);
+				break;
+
+			case ("RESF"):
+
+			case ("RESR"):
+
+			case ("CHKQ"):
+
+			case ("NONE"):
+				quitSession(s, output, input);
+				break;
+
+			default:
+				System.out.println("Switch Case Failed to Default");
+		}
+	}
+	
+	public static String scheduleJob(Socket s, DataOutputStream output, BufferedReader input, String job, String[] largestServer) throws IOException {
 		String[] jobArr = job.split(" ");
 		int jobIndex = Integer.parseInt(jobArr[2]);
-		// int jobRuntime = Integer.parseInt(jobArr[3]);
+		String serverType = largestServer[0];
+		
+		// SCHEDULE USING ROUND-ROBIN WITH JOB INDEX AND LARGEST SERVER COUNT
+		int serverIndex = jobIndex % Integer.parseInt(largestServer[9]);
 
-		String[] largestServer = getLargestServer(s, output, input);
-		String schdString = "SCHD "+jobIndex+" "+largestServer[0]+" "+largestServer[1];
+		String schdString = "SCHD "+jobIndex+" "+serverType+" "+serverIndex;
 		
 		// SCHEDULE THE JOB USING SCHD
 		System.out.println("C: Send '"+schdString+"' to server\n");
 		output.write((schdString+"\n").getBytes());
 		output.flush();
+
+		readResponse(s, output, input);
+
+		sendBasicCommand(s, output, input, "REDY");
+
+		// RETURN SERVER RESPONSE TO REDY TO CONTINUE LOOP
+		return readResponse(s, output, input);
 	}
+
 }
