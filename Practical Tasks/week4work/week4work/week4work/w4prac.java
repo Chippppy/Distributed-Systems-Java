@@ -3,7 +3,7 @@ import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
 
-public class prac {
+public class w4prac {
     
     public static void main(String[] args) {  
         try {      
