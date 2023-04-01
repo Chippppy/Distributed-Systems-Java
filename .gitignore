@@ -1,0 +1,6 @@
+# This file acts to stop unnecessary files being uploaded to the repository.
+# These files do not affect the performance of the client created.
+
+# Ignore all files below.
+settings.json
+.vscode
