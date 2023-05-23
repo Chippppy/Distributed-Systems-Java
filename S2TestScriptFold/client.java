@@ -25,9 +25,14 @@ public class client {
                     case "fc":
                         algorithm = 1;
                         break;
-                    case "ss":
+                    case "ff":
                         algorithm = 2;
                         break;
+                    case "bf":
+                        algorithm = 3;
+                        break;
+                    case "wf":
+                        algorithm = 4;
                     default:
                         System.err.println("Invalid Algorithm chosen: " + algorithmStr);
                         System.exit(1);
@@ -246,6 +251,31 @@ public class client {
         return availableServers;
     }
 
+    public static String[] getBestFitServer(Socket s, DataOutputStream output, BufferedReader input, String[] jobInfo) throws IOException {
+
+        String[][] capableServers = getCapableServers(s, output, input, jobInfo);
+
+        String[] bestFitServer = capableServers[0];
+
+
+        //CHOSING RIGHT SERVER IS NOT WORKING WELL AT ALL - FIX THE BELOW...
+        for(int i=0;i<capableServers.length;i++) {
+            System.out.println(Arrays.toString(capableServers[i]));
+            System.out.println(Arrays.toString(bestFitServer));
+            
+            if(Integer.parseInt(capableServers[i][4]) >= Integer.parseInt(jobInfo[0])) { // Check if it has currently available core resources.
+                if(capableServers[i][7].compareTo("0") == 0 || capableServers[i][8].compareTo("0") == 0) { // Check if not having running and waiting jobs at the same time.
+                    if(Integer.parseInt(capableServers[i][4]) - Integer.parseInt(jobInfo[0]) < Math.abs(Integer.parseInt(bestFitServer[4]) - Integer.parseInt(jobInfo[0]))) { // Get the best fitness-value score;
+                        bestFitServer = capableServers[i];
+                        System.out.println("BEST CAPABLE SERVER IS "+Arrays.toString(bestFitServer));
+                    }
+                }
+            }
+        }
+
+        return bestFitServer;
+    }
+
     public static String scheduleJob(Socket s, DataOutputStream output, BufferedReader input, String job) throws IOException {
         String[] jobArr = job.split(" ");
         int jobIndex = Integer.parseInt(jobArr[2]);
@@ -272,7 +302,7 @@ public class client {
                 serverIndex = 0;
                 break;
             case 2:
-                //SPECIAL SAUCE
+                //FF
                 availableServers = getAvailableServers(s, output, input, jobInfo);
                 if(availableServers == null) {
                     capableServers = getCapableServers(s, output, input, jobInfo);
@@ -282,6 +312,15 @@ public class client {
                     serverType = availableServers[0][0];
                     serverIndex = Integer.parseInt(availableServers[0][1]);
                 }
+                break;
+            case 3:
+                //BF
+                String[] bestFitServer = getBestFitServer(s, output, input, jobInfo);
+                serverType = bestFitServer[0];
+                serverIndex = Integer.parseInt(bestFitServer[1]);
+                break;
+            case 4:
+                //WF
                 break;
             default:
                 serverType = serverInfo.get(-1)[0];
