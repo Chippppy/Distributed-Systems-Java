@@ -38,8 +38,8 @@ public class client {
             }
         }
 
-        System.out.println(algorithm);
-        System.out.println(verbose);
+        if(verbose)System.out.println("Algorithm code: "+algorithm);
+        if(verbose)System.out.println("Verbose mode: "+verbose);
 
         try {
             // CREATE SOCKET CONNECTION
