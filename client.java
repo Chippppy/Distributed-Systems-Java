@@ -15,11 +15,24 @@ public class client {
 
     public static void main(String[] args) {
 
+        if(args.length < 2) {
+            System.err.println("Invalid usage of client!");
+            System.err.println("Try 'java client -h' for help.");
+            System.exit(1);
+        }
+
         for (int i = 0; i < args.length; i++) {
+            if(args[i].equals("-h")) {
+                System.err.println("Correct Usage Example: 'java client -a ss | lrr | fc [-v]'\n");
+                System.err.println("Flags");
+                System.err.println("    -a: Select Algorithm to use. E.g. 'lrr', 'fc', 'ss'");
+                System.err.println("    -v: Verbose mode. Outputs all Strings\n");
+                System.exit(1);
+            }
             if (args[i].equals("-a") && i + 1 < args.length) {
                 String algorithmStr = args[i + 1];
                 switch (algorithmStr) {
-                    case "llr":
+                    case "lrr":
                         algorithm = 0;
                         break;
                     case "fc":
@@ -30,12 +43,19 @@ public class client {
                         break;
                     default:
                         System.err.println("Invalid Algorithm chosen: " + algorithmStr);
+                        System.err.println("Try 'java client -h' for help.");
                         System.exit(1);
                 }
             }
             if (args[i].equals("-v")) {
                 verbose = true;
             }
+        }
+
+        if(algorithm == -1) {
+            System.err.println("Invalid usage of client!");
+            System.err.println("Try 'java client -h' for help.");
+            System.exit(1);
         }
 
         if(verbose)System.out.println("Algorithm code: "+algorithm);
@@ -93,7 +113,9 @@ public class client {
             dout.close();
             s.close();
         } catch (Exception e) {
+            System.err.println("Error!\n");
             System.err.println(e);
+            System.err.println("\nClient Aborting!");
         }
     }
 
@@ -260,7 +282,7 @@ public class client {
         
         switch(algorithm) {
             case 0:
-                //LLR
+                //LRR
                 String[] largestServer = getLargestServer();
                 serverType = largestServer[0];
                 serverIndex = jobIndex % Integer.parseInt(largestServer[9]);
