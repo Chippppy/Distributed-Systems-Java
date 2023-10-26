@@ -1,4 +1,4 @@
-# COMP6105 Project
+# Distributed Systems Programming in Java
 
 Author - Harry Chipman
 StudentID - 46358749
